@@ -4,6 +4,7 @@ import subprocess
 import threading
 import queue
 import numpy as np
+import argparse
 from datetime import datetime
 
 # Cola para comunicación entre hilos
@@ -57,7 +58,7 @@ def stream_audio_from_youtube(youtube_url):
                 
     process.terminate()
 
-def transcription_worker(model_size="small", language="es"):
+def transcription_worker(model_size="small", language=None):
     """Procesa los chunks de audio y genera transcripciones."""
     model = whisper.load_model(model_size)
     while True:
@@ -121,5 +122,22 @@ def transcribe_live_stream(youtube_url, model_size="small",language="es"):
     output_thread.join()
 
 if __name__ == "__main__":
-    youtube_url = "https://www.youtube.com/watch?v=qlpsvA6L7iA"
-    transcribe_live_stream(youtube_url)
+    
+    parser = argparse.ArgumentParser(description='Transcribe YouTube live streams en tiempo real.')
+    parser.add_argument('--url', type=str, required=True,
+                        help='URL del stream de YouTube a transcribir')
+    parser.add_argument('--model', type=str, default="small", choices=["tiny", "base", "small", "medium", "large"],
+                        help='Tamaño del modelo de Whisper a utilizar')
+    parser.add_argument('--language', type=str, default=None,
+                        help='Código de idioma para la transcripción (ej: es, en, fr)')
+    
+    args = parser.parse_args()
+    
+    print("Iniciando transcripción del stream...")
+    print(f"URL: {args.url}")
+    print(f"Modelo: {args.model}")
+    print(f"Idioma: {args.language}")
+    
+    
+    transcribe_live_stream(args.url, args.model, args.language)
+   
