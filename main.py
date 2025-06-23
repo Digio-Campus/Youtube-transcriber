@@ -28,6 +28,7 @@ def stream_audio_from_youtube(youtube_url):
     # Usar FFmpeg para procesar el stream en tiempo real
     cmd = [
         'ffmpeg', 
+        '-loglevel', 'quiet',  # Silenciar la salida de FFmpeg
         '-i', stream_url, 
         '-vn',  # Sin video
         '-acodec', 'pcm_s16le',  # Audio en formato PCM de 16 bits
@@ -62,7 +63,7 @@ def transcription_worker(model_size="small", language="es"):
     while True:
         try:
             audio_data = audio_queue.get(timeout=60)
-            result = model.transcribe(audio_data, language=language, verbose=False,)
+            result = model.transcribe(audio_data, language=language)
             timestamp = datetime.now().strftime("%H:%M:%S")
             transcription_queue.put((timestamp, result["text"]))
             
@@ -79,6 +80,7 @@ def output_worker():
             try:
                 timestamp, text = transcription_queue.get(timeout=60)
                 output = f"[{timestamp}]: {text}"
+                print(output)
                 f.write(output + "\n")
                 f.flush()
                 
