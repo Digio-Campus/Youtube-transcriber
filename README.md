@@ -49,7 +49,27 @@ ffmpeg-python
 
 ## Uso
 
-Este proyecto está en desarrollo. Las instrucciones de uso se proporcionarán próximamente.
+Para ejecutar el transcriptor con los valores predeterminados solo es necesario la url del stream:
+
+```bash
+python main.py --url "https://www.youtube.com/watch?v=STREAM_ID"
+```
+Si deseas mayor control cueanta con las siguientes opciones:
+
+```bash
+python main.py --url "https://www.youtube.com/watch?v=STREAM_ID" --model "base" --language "es" --output "transcripcion.txt" --chunk-size 10
+```   
+
+Opciones disponibles:
+- `--url`: URL del stream de YouTube a transcribir
+- `--model`: Tamaño del modelo Whisper a utilizar (tiny, base, small, medium, large), predeterminado es `small`
+- `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado detecta automáticamente
+- `--output`: Archivo de salida para guardar la transcripción, predeterminado es `transcripcion.txt`
+- `--chunk-size`: Tamaño del fragmento de audio en segundos, predeterminado es `10`
+
+### Terminación del programa
+
+Para detener la transcripción en cualquier momento, simplemente presiona **Ctrl+C**. El programa finalizará de manera controlada, asegurándose de que todos los procesos terminen correctamente y que las transcripciones se guarden.
 
 ## Estado del proyecto
 

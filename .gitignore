@@ -1,3 +1,6 @@
+#Specifics files of the project 
+transcripcion.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
