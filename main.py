@@ -155,7 +155,7 @@ if __name__ == "__main__":
     print(f"Idioma: {args.language}")
     print(f"Archivo de salida: {args.output}")
     print(f"Tamaño del chunk: {args.chunk_size} segundos")
-    print(f"Tiempo de espera: {args.timeout} segundos")
+  
     
     
     transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size)
