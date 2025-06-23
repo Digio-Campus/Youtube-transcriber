@@ -20,7 +20,7 @@ def get_audio_stream_url(youtube_url):
         info = ydl.extract_info(youtube_url, download=False)
         return info['url']
     
-def stream_audio_from_youtube(youtube_url):
+def stream_audio_from_youtube(youtube_url, chunk_size=10):
     """Captura el audio de YouTube y lo coloca en chunks en la cola."""
     
     # Obtener la URL del stream de audio
@@ -41,7 +41,7 @@ def stream_audio_from_youtube(youtube_url):
         
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         
-    chunk_size = 16000 * 10  # 10 segundos de audio a 16kHz
+    chunk_size = 16000 * chunk_size  # Tamaño del chunk en segundos a 16kHz
     while True:
         try:
             chunk = process.stdout.read(chunk_size * 2)  # 16-bit = 2 bytes por muestra
@@ -74,9 +74,9 @@ def transcription_worker(model_size="small", language=None):
         except Exception as e:
             print(f"Error en transcripción: {e}")
             
-def output_worker():
+def output_worker(output_file="transcripcion.txt"):
     """Muestra las transcripciones a medida que están disponibles."""
-    with open("transcripcion.txt", "a", encoding="utf-8") as f:
+    with open(output_file, "a", encoding="utf-8") as f:
         while True:
             try:
                 timestamp, text = transcription_queue.get(timeout=60)
@@ -91,12 +91,12 @@ def output_worker():
             except Exception as e:
                 print(f"Error mostrando transcripción: {e}")
 
-def transcribe_live_stream(youtube_url, model_size="small",language="es"):
+def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", chunk_size=10):
     """Inicia los hilos para transcribir un stream en vivo."""
     # Iniciar hilo para capturar audio
     audio_thread = threading.Thread(
         target=stream_audio_from_youtube, 
-        args=(youtube_url,)
+        args=(youtube_url, chunk_size)
     )
     audio_thread.daemon = True
     audio_thread.start()
@@ -112,6 +112,7 @@ def transcribe_live_stream(youtube_url, model_size="small",language="es"):
     # Iniciar hilo para mostrar resultados
     output_thread = threading.Thread(
         target=output_worker,
+        args=(output_file,)
     )
     output_thread.daemon = True
     output_thread.start()
@@ -130,6 +131,10 @@ if __name__ == "__main__":
                         help='Tamaño del modelo de Whisper a utilizar')
     parser.add_argument('--language', type=str, default=None,
                         help='Código de idioma para la transcripción (ej: es, en, fr)')
+    parser.add_argument('--output', type=str, default="transcripcion.txt",
+                        help='Archivo de salida para guardar la transcripción')
+    parser.add_argument('--chunk-size', type=int, default=10, 
+                        help='Tamaño del fragmento de audio en segundos')
     
     args = parser.parse_args()
     
@@ -137,7 +142,9 @@ if __name__ == "__main__":
     print(f"URL: {args.url}")
     print(f"Modelo: {args.model}")
     print(f"Idioma: {args.language}")
+    print(f"Archivo de salida: {args.output}")
+    print(f"Tamaño del chunk: {args.chunk_size} segundos")
+    print(f"Tiempo de espera: {args.timeout} segundos")
     
     
-    transcribe_live_stream(args.url, args.model, args.language)
-   
+    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size)
