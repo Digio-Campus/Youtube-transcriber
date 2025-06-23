@@ -49,58 +49,78 @@ def stream_audio_from_youtube(youtube_url, chunk_size=10):
         '-ac', '1',
         '-'
     ]
+    try:    
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        
-    chunk_size = 16000 * chunk_size  # Tamaño del chunk en segundos a 16kHz
-    while True:
-        try:
-            chunk = process.stdout.read(chunk_size * 2)  # 16-bit = 2 bytes por muestra
+        chunk_samples = 16000 * chunk_size  # Tamaño del chunk en segundos a 16kHz
+        while True:
+            chunk = process.stdout.read(chunk_samples * 2)  # 16-bit = 2 bytes por muestra
             if not chunk:
+                print("[Stream] Fin del stream o error al leer audio.")
                 break
-                    
+
             # Convertir a numpy array para procesamiento
             audio_data = np.frombuffer(chunk, np.int16).astype(np.float32) / 32768.0
             audio_queue.put(audio_data)
-                
-        except Exception as e:
+                            
+    except Exception as e:
             print(f"Error capturando audio: {e}")
-            break
-                
-    process.terminate()
+    
+    finally:
+        print("[Stream] Cerrando proceso de audio.")
+        audio_queue.put(None)
+        try:
+            process.terminate()
+            process.wait(5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        
 
 def transcription_worker(model_size="small", language=None):
     """Procesa los chunks de audio y genera transcripciones."""
     model = whisper.load_model(model_size)
     while True:
         try:
-            audio_data = audio_queue.get(timeout=60)
+            audio_data = audio_queue.get(timeout=30)
+            if audio_data is None:
+                print("[Reporducción] Fin de la cola de audio. ")
+                break  # Terminar si se recibe None
+
             result = model.transcribe(audio_data, language=language)
             timestamp = datetime.now().strftime("%H:%M:%S")
             transcription_queue.put((timestamp, result["text"]))
             
         except queue.Empty:
-            print("No se recibió audio en 60 segundos, finalizando...")
+            print("[WARNING] No se recibió audio en 30 segundos, finalizando.")
             break
         except Exception as e:
             print(f"Error en transcripción: {e}")
-            
+            continue
+    transcription_queue.put((None, "Transcripción finalizada."))
+
+
 def output_worker(output_file="transcripcion.txt"):
     """Muestra las transcripciones a medida que están disponibles."""
     with open(output_file, "a", encoding="utf-8") as f:
         while True:
             try:
-                timestamp, text = transcription_queue.get(timeout=60)
-                output = f"[{timestamp}]: {text}"
-                print(output)
-                f.write(output + "\n")
-                f.flush()
+                timestamp, text = transcription_queue.get(timeout=30)
+                if timestamp is None:
+                    print(f"[Transcripción] {text}")
+                    break  # Terminar si se recibe None 
+                
+                if text.strip():
+                    output = f"[{timestamp}]: {text}"
+                    print(output)
+                    f.write(output + "\n")
+                    f.flush()
                 
             except queue.Empty:
-                print("No se recibieron transcripciones en 60 segundos, finalizando...")
+                print("[WARNING] No se recibieron transcripciones en 30 segundos, finalizando.")
                 break
             except Exception as e:
                 print(f"Error mostrando transcripción: {e}")
+                continue
 
 def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", chunk_size=10):
     """Inicia los hilos para transcribir un stream en vivo."""
