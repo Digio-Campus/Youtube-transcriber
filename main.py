@@ -6,6 +6,17 @@ import queue
 import numpy as np
 import argparse
 from datetime import datetime
+import signal
+import sys
+
+# Manejo de interrupciones manual
+# Permite cerrar el script con Ctrl+C sin dejar procesos colgando
+def signal_handler(sig, frame):
+    print('Interrupción manual detectada. Cerrando...')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
 
 # Cola para comunicación entre hilos
 audio_queue = queue.Queue()
