@@ -1,3 +1,4 @@
+import whisperx.diarize
 import yt_dlp
 import tempfile
 import os
@@ -79,7 +80,7 @@ def extract_youtube_audio(youtube_url, chunk_size=10):
             audio_queue.put(None)  # Señalizar fin de la extracción 
             
 
-def transcribe_with_whisperx(model_size="small", language=None):
+def transcribe_with_whisperx(model_size="small", language=None, token=None):
     """Transcribe los chunks de audio usando WhisperX con marcas de tiempo a nivel de palabra."""
 
     # Configurar y cargar el modelo WhisperX     
@@ -87,8 +88,16 @@ def transcribe_with_whisperx(model_size="small", language=None):
     compute_type = "float16" if torch.cuda.is_available() else "int8"       # Tipo de cómputo, whisper solo manejea floats32
 
     print(f"Cargando modelo WhisperX en {device}...")
-    model = whisperx.load_model(model_size, device="cpu", compute_type="int8")
+    model = whisperx.load_model(model_size, device, compute_type=compute_type, language=language)
 
+    try:
+        diarize_model = whisperx.diarize.DiarizationPipeline(
+            use_auth_token = token,
+            device=device
+        )
+        print("Modelo de diarización cargado correctamente")
+    except Exception as e:
+        print(f"Error al cargar el modelo de diarización: {e}")
 
 
     while True:
@@ -105,8 +114,12 @@ def transcribe_with_whisperx(model_size="small", language=None):
             audio = whisperx.load_audio(audio_file)
 
             # Transcribir audio
-            result = model.transcribe(audio, language=language, verbose=False)
-            
+            result = model.transcribe(audio, batch_size=16)
+
+            # Diarizar segmentos
+            diarize_segments = diarize_model(audio)
+            result = whisperx.assign_word_speakers(diarize_segments, result)
+
             # Verificar si el archivo es de stream y eliminarlo después de transcribir
             if(audio_file.startswith("temp_stream")):
                 os.remove(audio_file) 
@@ -136,29 +149,28 @@ def output_worker(output_file="transcripcion.txt"):
     with open(output_file, "a", encoding="utf-8") as f:
         while True:
             try:
-                result = result_queue.get(timeout=60)  # Esperar hasta 60cd segundos por un resultado
+                result = result_queue.get() 
                 if result is None:
                     print("Redacción completa. Resultados guardados en ", output_file)
                     break
                 
-                print(result['text'])  # Mostrar transcripción en consola
-                f.write(result['text'] + "\n")  # Guardar transcripción en archivo
+                for segment in result["segments"]:
+                    segment = f'{segment["speaker"]}: {segment["text"].strip()}'
+                    print(segment)  # Mostrar transcripción en consola
+                    f.write(segment + "\n")  # Guardar transcripción en archivo
                 f.flush()
-            
-            except queue.Empty:
-                print("[WARNING] No se recibieron transcripciones en 60 segundos, finalizando.")
-                break
+
             except Exception as e:
                 print(f"Error mostrando transcripción: {e}")
                 continue
    
 
-def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", chunk_size=10):
+def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", chunk_size=10, token=None):
     """Inicia los hilos para transcribir un stream en vivo.""" 
     # Iniciar hilo para capturar audio
     extractor_thread = threading.Thread(
-        target=extract_youtube_audio, 
-        args=(youtube_url,chunk_size)
+        target=extract_youtube_audio,
+        args=(youtube_url, chunk_size)
     )
     extractor_thread.daemon = True
     extractor_thread.start()
@@ -166,7 +178,7 @@ def transcribe_live_stream(youtube_url, model_size="small", language="es", outpu
     # Iniciar hilo para transcripción
     transcription_thread = threading.Thread(
         target=transcribe_with_whisperx,
-        args=(model_size, language)
+        args=(model_size, language, token)
     )
     transcription_thread.daemon = True
     transcription_thread.start()
@@ -197,6 +209,8 @@ if __name__ == "__main__":
                         help='Archivo de salida para guardar la transcripción')
     parser.add_argument('--chunk-size', type=int, default=40, 
                         help='Tamaño del fragmento de audio en segundos')
+    parser.add_argument('--token', type=str, required=True,
+                        help='Token de autenticación para el modelo de diarización')
     
     args = parser.parse_args()
     
@@ -206,5 +220,7 @@ if __name__ == "__main__":
     print(f"Idioma: {args.language}")
     print(f"Archivo de salida: {args.output}")
     print(f"Tamaño del chunk: {args.chunk_size} segundos")
+    print(f"Token de diarización: {args.token}")
+    print()
 
-    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size )
+    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size, args.token)
