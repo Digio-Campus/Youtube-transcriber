@@ -1,21 +1,26 @@
 # Stream Transcriber
 
-Un proyecto para transcribir streams de YouTube a texto en tiempo real.
+Un proyecto para transcribir vídeos de YouTube a texto en tiempo real, admitiendo tanto streams en vivo como vídeos ya subidos a la plataforma.
 
 ## Descripción
 
-Stream Transcriber es una herramienta que permite capturar streams de YouTube y transcribir su contenido de audio a texto de forma automática mientras el stream está en vivo. Este proyecto está actualmente en fase inicial de desarrollo.
+Stream Transcriber es una herramienta que permite capturar streams de YouTube y transcribir su contenido de audio a texto de forma automática mientras el stream está en vivo. Este proyecto soporta dos modelos de transcripción:
 
-## Características (previstas)
+1. **Whisper**: Procesa los datos en memoria RAM y es adecuado para transcripciones rápidas.
+2. **WhisperX**: Utiliza archivos temporales y ofrece detección de hablantes. **(En desarrollo)**
+
+
+## Características 
 
 - Captura de streams de YouTube en vivo
 - Transcripción automática de audio a texto
 - Procesamiento en tiempo real
 - Guardado de transcripciones para consulta posterior
+- Soporte para modelos Whisper y WhisperX
 
 ## Requisitos
 
-- Python 3.8 o superior
+- Python 3.8 o superior (hasta 3.12 para compatibilidad con WhisperX)
 - FFmpeg instalado en el sistema
 - Conexión a internet
 
@@ -63,7 +68,7 @@ python main.py --url "https://www.youtube.com/watch?v=STREAM_ID" --model "base" 
 Opciones disponibles:
 - `--url`: URL del stream de YouTube a transcribir
 - `--model`: Tamaño del modelo Whisper a utilizar (tiny, base, small, medium, large), predeterminado es `small`
-- `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado detecta automáticamente
+- `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado se detecta automáticamente
 - `--output`: Archivo de salida para guardar la transcripción, predeterminado es `transcripcion.txt`
 - `--chunk-size`: Tamaño del fragmento de audio en segundos, predeterminado es `10`
 
