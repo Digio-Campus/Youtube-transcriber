@@ -17,6 +17,7 @@ Stream Transcriber es una herramienta que permite capturar streams de YouTube y 
 - Procesamiento en tiempo real
 - Guardado de transcripciones para consulta posterior
 - Soporte para modelos Whisper y WhisperX
+- Posibilidad de diarización de hablantes (WhisperX)
 
 ## Requisitos
 
@@ -32,6 +33,7 @@ Se encontrarán las siguientes dependencias en el archivo `requirements.txt`:
 yt-dlp
 openai-whisper
 ffmpeg-python
+whisperx
 ```
 
 ## Instalación
@@ -52,21 +54,49 @@ ffmpeg-python
    - Para macOS (con Homebrew): `brew install ffmpeg`
    - Para Windows: [Descargar FFmpeg](https://ffmpeg.org/download.html)
 
+4. En caso de utilizar WhisperX.
+
+ La instalación suele dar problemas, la propia pagina de [WhisperX](https://github.com/m-bain/whisperX) tiene un apartado de solucion de problemas que puedes consultar. 
+
+
+ Si sigue dando problemas, una posible solucion para tarjetas NVIDIA en sistemas operativos Ubuntu/Debian es la siguiente: 
+
+   - Se necesita tener instalado el paquete `nvidia-cuda-toolkit` para ello ejecuta:
+   ```bash
+      sudo apt update && sudo apt install -y nvidia-cuda-toolkit
+   ```
+
+   - Luego sigue la guía de instalación de cuDNN para tu sistema operativo. Puedes encontrar las instrucciones en el sitio oficial de [NVIDIA](https://developer.nvidia.com/cuda-downloads).
+
+   - Finalmente, hay que ejecutar:
+   ```bash
+      # Añadir el repo de NVIDIA si no está
+      sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+      sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+
+      # Actualizar e instalar cuDNN
+      sudo apt update
+      sudo apt install libcudnn8 libcudnn8-dev libcudnn8-samples
+   ```
+
 ## Uso
 
-Para ejecutar el transcriptor con los valores predeterminados solo es necesario la url del stream:
+Para ejecutar el transcriptor de whisper con los valores predeterminados solo es necesario la url del stream:
 
 ```bash
-python main.py --url "https://www.youtube.com/watch?v=STREAM_ID"
+python transcriptor-whisper.py --url "https://www.youtube.com/watch?v=STREAM_ID"
 ```
-Si deseas mayor control cueanta con las siguientes opciones:
+
+Por otro lado, si deseas utilizar WhisperX, puedes ejecutar el siguiente comando:
 
 ```bash
-python main.py --url "https://www.youtube.com/watch?v=STREAM_ID" --model "base" --language "es" --output "transcripcion.txt" --chunk-size 10
-```   
+python transcriptor-whisper.py --url "https://www.youtube.com/watch?v=STREAM_ID" --token "YOUR_HG_KEY" 
+```
 
-Opciones disponibles:
+
+Los argumentos disponibles son:
 - `--url`: URL del stream de YouTube a transcribir
+- `--token`: Token de Hugging Face necesario para utilizar la diarización en WhisperX, para más información visita el repositorio de [WhisperX](https://github.com/m-bain/whisperX?tab=readme-ov-file#speaker-diarization)
 - `--model`: Tamaño del modelo Whisper a utilizar (tiny, base, small, medium, large), predeterminado es `small`
 - `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado se detecta automáticamente
 - `--output`: Archivo de salida para guardar la transcripción, predeterminado es `transcripcion.txt`
@@ -75,6 +105,11 @@ Opciones disponibles:
 ### Terminación del programa
 
 Para detener la transcripción en cualquier momento, simplemente presiona **Ctrl+C**. El programa finalizará de manera controlada, asegurándose de que todos los procesos terminen correctamente y que las transcripciones se guarden.
+
+## Comentario sobre el proyecto
+La implementación del modelo de Whisper es bastante sencilla, ya que se basa en la librería `openai-whisper` y no requiere de una configuración compleja. Además, el procesamiento se realiza en memoria RAM, lo que permite una transcripción rápida y eficiente. Se recomienda utilizar este script.
+
+La implementación de WhisperX es más complicada debido a la necesidad de manejar archivos temporales y la detección de hablantes, lo que añade un nivel adicional de complejidad al proyecto. El rendimiento del modelo, o al menos de esta implementación, no es tan bueno como el de Whisper,dejando incluso bloques de audio sin procesar, por lo que se recomienda utilizarlo solo si se desea usar la diarización.
 
 ## Estado del proyecto
 
