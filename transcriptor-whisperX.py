@@ -1,5 +1,4 @@
 import yt_dlp
-import whisper
 import tempfile
 import os
 import uuid
@@ -7,6 +6,11 @@ import threading
 import queue
 import argparse
 import time
+import whisperx
+import gc
+import torch
+
+
 
 # Cola para comunicación entre hilos
 audio_queue = queue.Queue()
@@ -75,13 +79,18 @@ def extract_youtube_audio(youtube_url, chunk_size=10):
             audio_queue.put(None)  # Señalizar fin de la extracción 
             
 
-def transcribe_audio_chunks(model_size="small", language=None):
-    """Transcribe los chunks de audio usando Whisper."""
-    
-    # Cargar modelo de Whisper
-    print("Cargando modelo Whisper...")
-    model = whisper.load_model("base")  # Puedes usar "small", "medium", "large" para mejor calidad
-    
+def transcribe_with_whisperx(model_size="small", language=None):
+    """Transcribe los chunks de audio usando WhisperX con marcas de tiempo a nivel de palabra."""
+
+    # Configurar y cargar el modelo WhisperX     
+    device = "cuda" if torch.cuda.is_available() else "cpu"                 # Configurar dispositivo, whisperX no detecta automáticamente.
+    compute_type = "float16" if torch.cuda.is_available() else "int8"       # Tipo de cómputo, whisper solo manejea floats32
+
+    print(f"Cargando modelo WhisperX en {device}...")
+    model = whisperx.load_model(model_size, device="cpu", compute_type="int8")
+
+
+
     while True:
         # Obtener archivo de audio de la cola
         audio_file = audio_queue.get()
@@ -92,26 +101,34 @@ def transcribe_audio_chunks(model_size="small", language=None):
             break
             
         try:
-            # Transcribir audio
-            result = model.transcribe(audio_file) 
+            #Cargar audio
+            audio = whisperx.load_audio(audio_file)
 
+            # Transcribir audio
+            result = model.transcribe(audio, language=language, verbose=False)
+            
             # Verificar si el archivo es de stream y eliminarlo después de transcribir
             if(audio_file.startswith("temp_stream")):
                 os.remove(audio_file) 
-            
+
             # Añadir resultado a la cola de resultados
-            result_queue.put(result["text"])
+            result_queue.put(result)
             
         except Exception as e:
             print(f"Error en transcripción: {e}")
         
         finally:
             audio_queue.task_done()
-
+    
+    # Liberar memoria GPU
+    if device == "cuda":
+        gc.collect()
+        torch.cuda.empty_cache()
     
     # Señalizar fin de la transcripción
     result_queue.put(None)
     print("Transcripción completa.")
+
 
 
 def output_worker(output_file="transcripcion.txt"):
@@ -119,19 +136,17 @@ def output_worker(output_file="transcripcion.txt"):
     with open(output_file, "a", encoding="utf-8") as f:
         while True:
             try:
-                result = result_queue.get()
+                result = result_queue.get(timeout=60)  # Esperar hasta 60cd segundos por un resultado
                 if result is None:
-                    print("Redacción completa. Resultados guardados en 'transcripcion.txt'")
+                    print("Redacción completa. Resultados guardados en ", output_file)
                     break
-
-                if result.strip():
-                    print(result)
-                    f.write(result + "\n")
-                    f.flush()
-
-                # Procesar resultados
+                
+                print(result['text'])  # Mostrar transcripción en consola
+                f.write(result['text'] + "\n")  # Guardar transcripción en archivo
+                f.flush()
+            
             except queue.Empty:
-                print("[WARNING] No se recibieron transcripciones en 30 segundos, finalizando.")
+                print("[WARNING] No se recibieron transcripciones en 60 segundos, finalizando.")
                 break
             except Exception as e:
                 print(f"Error mostrando transcripción: {e}")
@@ -150,7 +165,7 @@ def transcribe_live_stream(youtube_url, model_size="small", language="es", outpu
     
     # Iniciar hilo para transcripción
     transcription_thread = threading.Thread(
-        target=transcribe_audio_chunks,
+        target=transcribe_with_whisperx,
         args=(model_size, language)
     )
     transcription_thread.daemon = True
@@ -180,7 +195,7 @@ if __name__ == "__main__":
                         help='Código de idioma para la transcripción (ej: es, en, fr)')
     parser.add_argument('--output', type=str, default="transcripcion.txt",
                         help='Archivo de salida para guardar la transcripción')
-    parser.add_argument('--chunk-size', type=int, default=10, 
+    parser.add_argument('--chunk-size', type=int, default=40, 
                         help='Tamaño del fragmento de audio en segundos')
     
     args = parser.parse_args()
@@ -192,4 +207,4 @@ if __name__ == "__main__":
     print(f"Archivo de salida: {args.output}")
     print(f"Tamaño del chunk: {args.chunk_size} segundos")
 
-    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size)
+    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size )
