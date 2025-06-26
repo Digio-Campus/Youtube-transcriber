@@ -3,3 +3,4 @@ openai-whisper
 ffmpeg-python
 whisperx
 jellyfish
+unidecode
