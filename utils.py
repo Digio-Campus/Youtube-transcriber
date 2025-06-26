@@ -15,7 +15,7 @@ def get_audio_stream_url(youtube_url):
 
 
 def load_correct_words(file_path="palabras_correctas.json"):
-    """Carga la lista de palabras correctas desde un archivo JSON."""
+    """Carga un set de palabras correctas desde un archivo JSON."""
     correct_words = set()  # Usar un set para evitar duplicados 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -53,9 +53,10 @@ def levinshtein_distance(palabra_incorrecta, set_palabras_correctas, umbral=0.8)
     """Calcula la distancia de Levenshtein entre una palabra incorrecta y una lista de palabras correctas."""
     mejor_coincidencia = None
     mejor_puntuacion = 0
+    palabra_incorrecta_lower = palabra_incorrecta.lower()  # Normalizar a minúsculas para comparación
     
     for palabra_correcta in set_palabras_correctas:
-        similitud = 1 - (jellyfish.levenshtein_distance(palabra_incorrecta, palabra_correcta) / 
+        similitud = 1 - (jellyfish.levenshtein_distance(palabra_incorrecta_lower, palabra_correcta.lower()) / 
                          max(len(palabra_incorrecta), len(palabra_correcta)))
         
         if similitud > mejor_puntuacion and similitud > umbral:
@@ -93,7 +94,7 @@ def corregir_texto(texto, set_palabras_correctas, umbral=0.8, indice_fonetico=No
     
     for palabra in palabras:
         
-        if palabra.lower() in set_palabras_correctas:
+        if palabra in set_palabras_correctas:
             continue # La palabra ya es correcta
         
         if palabra.isdigit():
