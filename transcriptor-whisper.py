@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime
 import signal
 import sys
-from utils import get_audio_stream_url, load_correct_words
+from utils import get_audio_stream_url, load_correct_words, corregir_texto
 
 # Manejo de interrupciones manual
 # Permite cerrar el script con Ctrl+C sin dejar procesos colgando
@@ -104,12 +104,13 @@ def correct_transcriptions(input_file=None):
                 print(f"[Transcripción] {text}")
                 break  # Terminar si se recibe None
             
-            if correct_words:
-                # Aquí podrías implementar correcciones adicionales si es necesario
-                corrected_text = text.strip() + " (corregido)"  # Ejemplo de corrección simple
+            if correct_words and len(correct_words) > 0:
+                # Usar la función optimizada de corrección
+                corrected_text = corregir_texto(text.strip(), correct_words, umbral=0.8)
                 correction_queue.put((timestamp, corrected_text))
             else:
-                correction_queue.put((timestamp, text))
+                # Sin corrección, pasar el texto tal como está
+                correction_queue.put((timestamp, text.strip()))
             
         except queue.Empty:
             print("[WARNING] No se recibieron transcripciones en 30 segundos, finalizando.")
@@ -117,7 +118,7 @@ def correct_transcriptions(input_file=None):
         except Exception as e:
             print(f"Error corrigiendo transcripción: {e}")
             continue
-    correction_queue.put((None, "Correción finalizada."))
+    correction_queue.put((None, "Corrección finalizada."))
 
 
 def output_worker(output_file="transcripcion.txt"):
