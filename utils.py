@@ -3,6 +3,9 @@ import json
 import jellyfish
 import re   
 
+# Cache global para correcciones ya realizadas
+_cache_correcciones = {}
+
 def get_audio_stream_url(youtube_url):
     """Obtiene la URL del stream de audio de YouTube."""
     ydl_opts = {
@@ -93,17 +96,32 @@ def corregir_texto(texto, set_palabras_correctas, umbral=0.8, indice_fonetico=No
     texto_corregido = texto
     
     for palabra in palabras:
-        
+
         if palabra in set_palabras_correctas:
             continue # La palabra ya es correcta
-        
+
         if palabra.isdigit():
             continue # Ignorar palabras muy cortas o números
+
+        cache_key = palabra.lower()
+        cache = False # Variable para controlar si se usa cache
+        if cache_key in _cache_correcciones:
+            palabra_corregida = _cache_correcciones[cache_key] # Evitar correcciones innecesarias
+            print(f"[CACHE HIT] Palabra '{palabra}' ya corregida a {palabra_corregida}.")
+            cache = True
+        else:
+            palabra_corregida = corregir_palabra(palabra, indice_fonetico, set_palabras_correctas, umbral)
         
-        palabra_corregida = corregir_palabra(palabra, indice_fonetico, set_palabras_correctas, umbral)
         if palabra_corregida != palabra:
+            if not cache:
+                # Guardar en cache 
+                _cache_correcciones[cache_key] = palabra_corregida
+            
             # Reemplazar la palabra incorrecta por la corregida en el texto
             texto_corregido = re.sub(r'\b' + re.escape(palabra) + r'\b', 
                                    palabra_corregida + (" (corregida)"), texto_corregido)
+            
+        
     
     return texto_corregido
+
