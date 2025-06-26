@@ -1,4 +1,3 @@
-import yt_dlp
 import whisper
 import subprocess
 import threading
@@ -8,7 +7,7 @@ import argparse
 from datetime import datetime
 import signal
 import sys
-import json
+from utils import get_audio_stream_url, load_correct_words
 
 # Manejo de interrupciones manual
 # Permite cerrar el script con Ctrl+C sin dejar procesos colgando
@@ -24,15 +23,6 @@ audio_queue = queue.Queue()
 transcription_queue = queue.Queue()
 correction_queue = queue.Queue()
 
-def get_audio_stream_url(youtube_url):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'quiet': True,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=False)
-        return info['url']
-    
 def stream_audio_from_youtube(youtube_url, chunk_size=10):
     """Captura el audio de YouTube y lo coloca en chunks en la cola."""
     
@@ -99,32 +89,6 @@ def transcription_worker(model_size="small", language=None):
             print(f"Error en transcripción: {e}")
             continue
     transcription_queue.put((None, "Transcripción finalizada."))
-
-def load_correct_words(file_path="palabras_correctas.json"):
-    """Carga la lista de palabras correctas desde un archivo JSON."""
-    correct_words = []
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
-        # Si el JSON tiene categorías, combinar todas las listas
-        if isinstance(data, dict):
-            for category in data.values():
-                if isinstance(category, list):
-                    correct_words.extend(category)
-        # Si es una lista directa
-        elif isinstance(data, list):
-            correct_words = data
-            
-    except FileNotFoundError:
-        print(f"Archivo {file_path} no encontrado. No se cargarán palabras correctas.")
-    except json.JSONDecodeError:
-        print(f"Error al leer el archivo JSON {file_path}.")
-    except Exception as e:
-        print(f"Error cargando palabras correctas: {e}")
-    
-    return correct_words
-
 
 def correct_transcriptions(input_file=None):
     """Corrige las transcripciones en la cola."""
