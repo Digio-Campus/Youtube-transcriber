@@ -1,7 +1,8 @@
 import yt_dlp
 import json
 import jellyfish
-import re   
+import re
+from unidecode import unidecode   
 
 # Cache global para correcciones ya realizadas
 _cache_correcciones = {}
@@ -56,10 +57,12 @@ def levinshtein_distance(palabra_incorrecta, set_palabras_correctas, umbral=0.8)
     """Calcula la distancia de Levenshtein entre una palabra incorrecta y una lista de palabras correctas."""
     mejor_coincidencia = None
     mejor_puntuacion = 0
-    palabra_incorrecta_lower = palabra_incorrecta.lower()  # Normalizar a minúsculas para comparación
+    # Normalizar para comparación (minúsculas + sin tildes)
+    palabra_incorrecta_norm = normalizar_palabra(palabra_incorrecta)
     
     for palabra_correcta in set_palabras_correctas:
-        similitud = 1 - (jellyfish.levenshtein_distance(palabra_incorrecta_lower, palabra_correcta.lower()) / 
+        palabra_correcta_norm = normalizar_palabra(palabra_correcta)
+        similitud = 1 - (jellyfish.levenshtein_distance(palabra_incorrecta_norm, palabra_correcta_norm) / 
                          max(len(palabra_incorrecta), len(palabra_correcta)))
         
         if similitud > mejor_puntuacion and similitud > umbral:
@@ -100,28 +103,29 @@ def corregir_texto(texto, set_palabras_correctas, umbral=0.8, indice_fonetico=No
         if palabra in set_palabras_correctas:
             continue # La palabra ya es correcta
 
-        if palabra.isdigit():
+        if palabra.isdigit() or len(palabra) < 3:
             continue # Ignorar palabras muy cortas o números
 
-        cache_key = palabra.lower()
-        cache = False # Variable para controlar si se usa cache
+        # Usar palabra normalizada como clave del cache
+        cache_key = normalizar_palabra(palabra)
+        cache = False
         if cache_key in _cache_correcciones:
-            palabra_corregida = _cache_correcciones[cache_key] # Evitar correcciones innecesarias
-            print(f"[CACHE HIT] Palabra '{palabra}' ya corregida a {palabra_corregida}.")
+            palabra_corregida = _cache_correcciones[cache_key]
             cache = True
         else:
             palabra_corregida = corregir_palabra(palabra, indice_fonetico, set_palabras_correctas, umbral)
         
         if palabra_corregida != palabra:
             if not cache:
-                # Guardar en cache 
+                # Guardar en cache usando palabra normalizada como clave
                 _cache_correcciones[cache_key] = palabra_corregida
             
             # Reemplazar la palabra incorrecta por la corregida en el texto
             texto_corregido = re.sub(r'\b' + re.escape(palabra) + r'\b', 
                                    palabra_corregida + (" (corregida)"), texto_corregido)
-            
-        
     
     return texto_corregido
 
+def normalizar_palabra(texto):
+    """Normaliza una palabra: convierte a minúsculas y quita tildes."""
+    return unidecode(texto.lower())
