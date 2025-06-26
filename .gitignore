@@ -1,5 +1,6 @@
 #Specifics files of the project 
 transcripcion.txt
+palabras_correctas.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

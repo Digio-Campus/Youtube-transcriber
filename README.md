@@ -18,6 +18,7 @@ Stream Transcriber es una herramienta que permite capturar streams de YouTube y 
 - Guardado de transcripciones para consulta posterior
 - Soporte para modelos Whisper y WhisperX
 - Posibilidad de diarización de hablantes (WhisperX)
+- Corrección de errores
 
 ## Requisitos
 
@@ -34,6 +35,8 @@ yt-dlp
 openai-whisper
 ffmpeg-python
 whisperx
+jellyfish
+unidecode
 ```
 
 ## Instalación
@@ -101,15 +104,59 @@ Los argumentos disponibles son:
 - `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado se detecta automáticamente
 - `--output`: Archivo de salida para guardar la transcripción, predeterminado es `transcripcion.txt`
 - `--chunk-size`: Tamaño del fragmento de audio en segundos, predeterminado es `10`
+- `--correct-word`: Fichero de palabras correctas para la corrección de errores, predeterminado no se realiza corrección.
+
+### Ejemplo de ficheros de correcion de errores:
+Puedes crear un fichero de palabras correctas, por ejemplo `palabras_correctas.json`, con uno de los siguientes formatos:
+
+- O bien una lista de palabras:
+
+   ```json
+   [
+      "Ábalos",
+      "Koldo",
+      "UCO", 
+      "malversación"
+   ]
+   ```
+
+- O bien, para una mayor legibilidad, un diccionario:
+
+   ```json
+   {
+      "nombres": [
+      "Ábalos",
+      "Koldo"
+      ],
+      "palabras_tecnicas": [
+      "foral",
+      "amaños",
+      "UCO",
+      "malversación"
+      ],
+      "partidos_politicos": [
+      "Vox"
+      ]
+   }
+   ```
 
 ### Terminación del programa
 
-Para detener la transcripción en cualquier momento, simplemente presiona **Ctrl+C**. El programa finalizará de manera controlada, asegurándose de que todos los procesos terminen correctamente y que las transcripciones se guarden.
+Para detener la transcripción en cualquier momento, simplemente presiona **Ctrl+C**. El programa finalizará de manera controlada, asegurándose de que todos los procesos terminen correctamente y que las transcripciones se guarden (Actualmente, solo en whisper).
 
-## Comentario sobre el proyecto
+## Comentarios sobre los modelos de transcripción
 La implementación del modelo de Whisper es bastante sencilla, ya que se basa en la librería `openai-whisper` y no requiere de una configuración compleja. Además, el procesamiento se realiza en memoria RAM, lo que permite una transcripción rápida y eficiente. Se recomienda utilizar este script.
 
 La implementación de WhisperX es más complicada debido a la necesidad de manejar archivos temporales y la detección de hablantes, lo que añade un nivel adicional de complejidad al proyecto. El rendimiento del modelo, o al menos de esta implementación, no es tan bueno como el de Whisper,dejando incluso bloques de audio sin procesar, por lo que se recomienda utilizarlo solo si se desea usar la diarización.
+
+## Comentarios sobre la corrección de errores
+La corrección de errores se realiza usando la biblioteca `jellyfish`, que permite una doble funcionalidad:
+- **Corrección fonética**: Utiliza el algoritmo Metaphone para encontrar palabras que sean fonéticamente similares a una palabra incorrecta, lo que es útil para corregir errores de pronunciación o escritura rapidamente.
+- **Corrección de errores tipográficos**: Utiliza el algoritmo de Levenshtein para encontrar la palabra más similar en un conjunto de palabras correctas, como segunda opcción.
+
+Se ha probado con diferentes bibliotecas de corrección fonética, como `pyphonetics` y `abydos`, pero se ha optado por `jellyfish` por su simplicidad y eficacia.
+- pyphonetics: Utiliza también el algoritmo Metaphone, pero no permite la corrección de errores tipográficos.
+- abydos: Ofrece una implementación de Double Metaphone, pero su uso es más complejo y no aporta ventajas significativas sobre jellyfish.
 
 ## Estado del proyecto
 
