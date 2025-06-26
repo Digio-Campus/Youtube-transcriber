@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime
 import signal
 import sys
+import json
 
 # Manejo de interrupciones manual
 # Permite cerrar el script con Ctrl+C sin dejar procesos colgando
@@ -21,6 +22,7 @@ signal.signal(signal.SIGINT, signal_handler)
 # Cola para comunicación entre hilos
 audio_queue = queue.Queue()
 transcription_queue = queue.Queue()
+correction_queue = queue.Queue()
 
 def get_audio_stream_url(youtube_url):
     ydl_opts = {
@@ -98,15 +100,70 @@ def transcription_worker(model_size="small", language=None):
             continue
     transcription_queue.put((None, "Transcripción finalizada."))
 
+def load_correct_words(file_path="palabras_correctas.json"):
+    """Carga la lista de palabras correctas desde un archivo JSON."""
+    correct_words = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        # Si el JSON tiene categorías, combinar todas las listas
+        if isinstance(data, dict):
+            for category in data.values():
+                if isinstance(category, list):
+                    correct_words.extend(category)
+        # Si es una lista directa
+        elif isinstance(data, list):
+            correct_words = data
+            
+    except FileNotFoundError:
+        print(f"Archivo {file_path} no encontrado. No se cargarán palabras correctas.")
+    except json.JSONDecodeError:
+        print(f"Error al leer el archivo JSON {file_path}.")
+    except Exception as e:
+        print(f"Error cargando palabras correctas: {e}")
+    
+    return correct_words
+
+
+def correct_transcriptions(input_file=None):
+    """Corrige las transcripciones en la cola."""
+    if input_file is None:
+        correct_words = None
+    else:
+        correct_words = load_correct_words(input_file)
+
+    while True:
+        try:
+            timestamp, text = transcription_queue.get(timeout=30)
+            if timestamp is None:
+                print(f"[Transcripción] {text}")
+                break  # Terminar si se recibe None
+            
+            if correct_words:
+                # Aquí podrías implementar correcciones adicionales si es necesario
+                corrected_text = text.strip() + " (corregido)"  # Ejemplo de corrección simple
+                correction_queue.put((timestamp, corrected_text))
+            else:
+                correction_queue.put((timestamp, text))
+            
+        except queue.Empty:
+            print("[WARNING] No se recibieron transcripciones en 30 segundos, finalizando.")
+            break
+        except Exception as e:
+            print(f"Error corrigiendo transcripción: {e}")
+            continue
+    correction_queue.put((None, "Correción finalizada."))
+
 
 def output_worker(output_file="transcripcion.txt"):
     """Muestra las transcripciones a medida que están disponibles."""
     with open(output_file, "a", encoding="utf-8") as f:
         while True:
             try:
-                timestamp, text = transcription_queue.get(timeout=30)
+                timestamp, text = correction_queue.get(timeout=30)
                 if timestamp is None:
-                    print(f"[Transcripción] {text}")
+                    print(f"[Correción] {text}")
                     break  # Terminar si se recibe None 
                 
                 if text.strip():
@@ -116,13 +173,14 @@ def output_worker(output_file="transcripcion.txt"):
                     f.flush()
                 
             except queue.Empty:
-                print("[WARNING] No se recibieron transcripciones en 30 segundos, finalizando.")
+                print("[WARNING] No se recibieron transcripciones corregidas en 30 segundos, finalizando.")
                 break
             except Exception as e:
                 print(f"Error mostrando transcripción: {e}")
                 continue
 
-def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", chunk_size=10):
+def transcribe_live_stream(youtube_url, model_size="small", language="es", output_file="transcripcion.txt", 
+                           chunk_size=10, correct_words=None):
     """Inicia los hilos para transcribir un stream en vivo."""
     # Iniciar hilo para capturar audio
     audio_thread = threading.Thread(
@@ -139,6 +197,14 @@ def transcribe_live_stream(youtube_url, model_size="small", language="es", outpu
     )
     transcription_thread.daemon = True
     transcription_thread.start()
+
+    #Iniciar hilo para corrección de transcripciones
+    correction_thread = threading.Thread(
+        target=correct_transcriptions,
+        args=(correct_words,)
+    )
+    correction_thread.daemon = True
+    correction_thread.start()
     
     # Iniciar hilo para mostrar resultados
     output_thread = threading.Thread(
@@ -151,6 +217,7 @@ def transcribe_live_stream(youtube_url, model_size="small", language="es", outpu
     # Esperar a que terminen los hilos
     audio_thread.join()
     transcription_thread.join()
+    correction_thread.join()
     output_thread.join()
 
 if __name__ == "__main__":
@@ -166,6 +233,8 @@ if __name__ == "__main__":
                         help='Archivo de salida para guardar la transcripción')
     parser.add_argument('--chunk-size', type=int, default=10, 
                         help='Tamaño del fragmento de audio en segundos')
+    parser.add_argument('--correct-words', type=str, default=None,
+                        help='Archivo JSON con palabras correctas para corrección de transcripciones')
     
     args = parser.parse_args()
     
@@ -175,7 +244,8 @@ if __name__ == "__main__":
     print(f"Idioma: {args.language}")
     print(f"Archivo de salida: {args.output}")
     print(f"Tamaño del chunk: {args.chunk_size} segundos")
-  
+    print(f"Archivo de palabras correctas: {args.correct_words if args.correct_words else 'No se utilizará corrección'}")
+    print()
     
     
-    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size)
+    transcribe_live_stream(args.url, args.model, args.language, args.output, args.chunk_size, args.correct_words)
