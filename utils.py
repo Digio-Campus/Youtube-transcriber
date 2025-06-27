@@ -3,6 +3,7 @@ import json
 import jellyfish
 import re
 from unidecode import unidecode   
+import difflib
 
 # Cache global para correcciones ya realizadas
 _cache_correcciones = {}
@@ -54,22 +55,27 @@ def crear_indice_fonetico(set_palabras_correctas):
     return indice
 
 def levinshtein_distance(palabra_incorrecta, set_palabras_correctas, umbral=0.8):
-    """Calcula la distancia de Levenshtein entre una palabra incorrecta y una lista de palabras correctas."""
-    mejor_coincidencia = None
-    mejor_puntuacion = 0
-    # Normalizar para comparación (minúsculas + sin tildes)
+    """Encuentra la mejor coincidencia usando difflib - más eficiente y preciso."""
     palabra_incorrecta_norm = normalizar_palabra(palabra_incorrecta)
     
-    for palabra_correcta in set_palabras_correctas:
-        palabra_correcta_norm = normalizar_palabra(palabra_correcta)
-        similitud = 1 - (jellyfish.levenshtein_distance(palabra_incorrecta_norm, palabra_correcta_norm) / 
-                         max(len(palabra_incorrecta), len(palabra_correcta)))
-        
-        if similitud > mejor_puntuacion and similitud > umbral:
-            mejor_puntuacion = similitud
-            mejor_coincidencia = palabra_correcta
+    # Convertir set a lista normalizada con mapeo original
+    palabras_correctas_list = list(set_palabras_correctas)
+    palabras_norm = [normalizar_palabra(p) for p in palabras_correctas_list]
     
-    return mejor_coincidencia if mejor_coincidencia else palabra_incorrecta
+    # difflib.get_close_matches es MÁS EFICIENTE que un bucle manual
+    coincidencias = difflib.get_close_matches(
+        palabra_incorrecta_norm, 
+        palabras_norm, 
+        n=1,  # Solo la mejor coincidencia
+        cutoff=umbral
+    )
+    
+    if coincidencias:
+        # Encontrar la palabra original correspondiente
+        idx = palabras_norm.index(coincidencias[0])
+        return palabras_correctas_list[idx]
+    
+    return palabra_incorrecta
 
 def corregir_palabra(palabra_incorrecta, indice_fonetico, lista_palabras_correctas, umbral=0.8):
     """Versión optimizada de corrección de palabras usando índice fonético."""
