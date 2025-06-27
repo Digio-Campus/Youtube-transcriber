@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime
 import signal
 import sys
-from utils import get_audio_stream_url, load_correct_words, corregir_texto, crear_indice_fonetico
+from utils import crear_listas_palabras_correctas, get_audio_stream_url, load_correct_words, corregir_texto, crear_indice_fonetico
 
 # Manejo de interrupciones manual
 # Permite cerrar el script con Ctrl+C sin dejar procesos colgando
@@ -95,8 +95,7 @@ def correct_transcriptions(input_file=None):
     if input_file is None:
         correct_words = None
     else:
-        correct_words = load_correct_words(input_file)
-        indice_fonetico = crear_indice_fonetico(correct_words)
+        datos_correccion = load_correct_words(input_file)
 
     while True:
         try:
@@ -105,9 +104,9 @@ def correct_transcriptions(input_file=None):
                 print(f"[Transcripción] {text}")
                 break  # Terminar si se recibe None
             
-            if correct_words and len(correct_words) > 0:
+            if datos_correccion:
                 # Usar la función optimizada de corrección
-                corrected_text = corregir_texto(text.strip(), correct_words, umbral=0.7, indice_fonetico=indice_fonetico)
+                corrected_text = corregir_texto(text.strip(), datos_correccion, umbral=0.7)
                 correction_queue.put((timestamp, corrected_text))
             else:
                 # Sin corrección, pasar el texto tal como está

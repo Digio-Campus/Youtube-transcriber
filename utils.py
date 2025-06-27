@@ -42,7 +42,7 @@ def load_correct_words(file_path="palabras_correctas.json"):
     except Exception as e:
         print(f"Error cargando palabras correctas: {e}")
     
-    return correct_words
+    return crear_datos_precalculados(correct_words)
 
 def crear_indice_fonetico(set_palabras_correctas):
     """Crea un índice fonético para búsquedas más rápidas."""
@@ -54,13 +54,26 @@ def crear_indice_fonetico(set_palabras_correctas):
         indice[codigo].append(palabra)
     return indice
 
-def levinshtein_distance(palabra_incorrecta, set_palabras_correctas, umbral=0.8):
+def crear_listas_palabras_correctas(set_palabras_correctas):
+    # Pre-calcular listas normalizadas para difflib
+    palabras_correctas_list = list(set_palabras_correctas)
+    palabras_norm = [normalizar_palabra(p) for p in palabras_correctas_list]
+    return (palabras_correctas_list, palabras_norm)
+
+def crear_datos_precalculados(set_palabras_correctas):
+    """Crea un objeto de datos pre-calculados para corrección de palabras."""
+    return {
+        'set_palabras_correctas': set_palabras_correctas,
+        'indice_fonetico': crear_indice_fonetico(set_palabras_correctas),
+        'listas_palabras_correctas': crear_listas_palabras_correctas(set_palabras_correctas)
+    }
+
+def levinshtein_distance(palabra_incorrecta, listas_palabras, umbral=0.8):
     """Encuentra la mejor coincidencia usando difflib - más eficiente y preciso."""
     palabra_incorrecta_norm = normalizar_palabra(palabra_incorrecta)
     
-    # Convertir set a lista normalizada con mapeo original
-    palabras_correctas_list = list(set_palabras_correctas)
-    palabras_norm = [normalizar_palabra(p) for p in palabras_correctas_list]
+    # Desempaquetar las listas pre-calculadas
+    palabras_correctas_list, palabras_norm = listas_palabras
     
     # difflib.get_close_matches es MÁS EFICIENTE que un bucle manual
     coincidencias = difflib.get_close_matches(
@@ -77,7 +90,7 @@ def levinshtein_distance(palabra_incorrecta, set_palabras_correctas, umbral=0.8)
     
     return palabra_incorrecta
 
-def corregir_palabra(palabra_incorrecta, indice_fonetico, lista_palabras_correctas, umbral=0.8):
+def corregir_palabra(palabra_incorrecta, indice_fonetico, listas_palabras_correctas, umbral=0.8):
     """Versión optimizada de corrección de palabras usando índice fonético."""
     codigo_fonetico = jellyfish.metaphone(palabra_incorrecta)
     
@@ -90,27 +103,34 @@ def corregir_palabra(palabra_incorrecta, indice_fonetico, lista_palabras_correct
             return candidatos_foneticos[0]
         
         # Si hay múltiples candidatos fonéticos, usar Levenshtein para elegir el mejor
+        candidatos_foneticos_norm = [normalizar_palabra(p) for p in candidatos_foneticos]
+        candidatos_foneticos = (candidatos_foneticos, candidatos_foneticos_norm)
         return levinshtein_distance(palabra_incorrecta, candidatos_foneticos, umbral)
     
     # Si no hay coincidencia fonética, buscar por similitud Levenshtein
-    return levinshtein_distance(palabra_incorrecta, lista_palabras_correctas, umbral)
+    return levinshtein_distance(palabra_incorrecta, listas_palabras_correctas, umbral)
 
-def corregir_texto(texto, set_palabras_correctas, umbral=0.8, indice_fonetico=None):
+def corregir_texto(texto, datos_correccion, umbral=0.8):
     """Versión optimizada de corrección de texto."""
-    # Crear índice fonético si no se proporciona
-    if indice_fonetico is None:
-        indice_fonetico = crear_indice_fonetico(set_palabras_correctas)
-    
+    # Desempaquetar los datos pre-calculados
+    set_palabras_correctas = datos_correccion['set_palabras_correctas']
+    indice_fonetico = datos_correccion['indice_fonetico']
+    listas_palabras_correctas = datos_correccion['listas_palabras_correctas']
+
+    # Usar regex para encontrar palabras
     palabras = re.findall(r'\b\w+\b', texto)
     texto_corregido = texto
     
+    # Iterar sobre las palabras encontradas
     for palabra in palabras:
 
+        # Usar set para ignorar palabras ya correctas
         if palabra in set_palabras_correctas:
-            continue # La palabra ya es correcta
+            continue 
 
+        # Ignorar palabras muy cortas o números
         if palabra.isdigit() or len(palabra) < 3:
-            continue # Ignorar palabras muy cortas o números
+            continue 
 
         # Usar palabra normalizada como clave del cache
         cache_key = normalizar_palabra(palabra)
@@ -119,8 +139,8 @@ def corregir_texto(texto, set_palabras_correctas, umbral=0.8, indice_fonetico=No
             palabra_corregida = _cache_correcciones[cache_key]
             cache = True
         else:
-            palabra_corregida = corregir_palabra(palabra, indice_fonetico, set_palabras_correctas, umbral)
-        
+            palabra_corregida = corregir_palabra(palabra, indice_fonetico, listas_palabras_correctas, umbral)
+
         if palabra_corregida != palabra:
             if not cache:
                 # Guardar en cache usando palabra normalizada como clave
