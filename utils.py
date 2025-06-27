@@ -37,10 +37,15 @@ def load_correct_words(file_path="palabras_correctas.json"):
             
     except FileNotFoundError:
         print(f"Archivo {file_path} no encontrado. No se cargarán palabras correctas.")
+        return None
+    
     except json.JSONDecodeError:
         print(f"Error al leer el archivo JSON {file_path}.")
+        return None
+    
     except Exception as e:
         print(f"Error cargando palabras correctas: {e}")
+        return None
     
     return crear_datos_precalculados(correct_words)
 
