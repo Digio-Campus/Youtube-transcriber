@@ -211,7 +211,7 @@ def transcribe_live_stream(youtube_url, model_size="small", language="es", outpu
         print("[SISTEMA] Todos los hilos han terminado correctamente.")
         
     except KeyboardInterrupt:
-        # Este bloque probablemente no se ejecute ya que tenemos signal handler
+        # Captura Ctrl+C para terminación ordenada de todos los hilos
         print("[SISTEMA] Interrupción detectada en hilo principal.")
         shutdown_event.set()
         
