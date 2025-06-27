@@ -4,6 +4,7 @@ import jellyfish
 import re
 from unidecode import unidecode   
 import difflib
+import logging
 
 # Cache global para correcciones ya realizadas
 _cache_correcciones = {}
@@ -17,6 +18,20 @@ def get_audio_stream_url(youtube_url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
         return info['url']
+    
+# Configurar logging
+def setup_logging(debug=False):
+    """Configura el sistema de logging."""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),  # Consola
+            logging.FileHandler('transcriptor.log', encoding='utf-8')  # Archivo
+        ]
+    )
+    return logging.getLogger(__name__)
 
 
 def load_correct_words(file_path="palabras_correctas.json"):
