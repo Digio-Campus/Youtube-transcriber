@@ -18,11 +18,13 @@ Stream Transcriber es una herramienta que permite capturar streams de YouTube y 
 - Guardado de transcripciones para consulta posterior
 - Soporte para modelos Whisper y WhisperX
 - Posibilidad de diarización de hablantes (WhisperX)
-- **Sistema avanzado de corrección de errores**:
+- **Sistema de corrección de errores en la transcripción**:
   - Corrección fonética con algoritmo Metaphone
   - Corrección tipográfica con algoritmos de similitud de cadenas
   - Sistema de caché inteligente para optimización
   - Soporte para diccionarios personalizados de palabras correctas
+- **Sistema de logging integrado** para debugging y monitoreo
+- **Manejo robusto de errores** y terminación controlada
 
 ## Requisitos
 
@@ -89,24 +91,55 @@ unidecode
 
 ## Uso Whisper
 
+### Uso básico
 Para ejecutar el transcriptor de whisper con los valores predeterminados solo es necesario la url del stream:
 
 ```bash
 python transcriptor-whisper.py --url "https://www.youtube.com/watch?v=STREAM_ID"
 ```
 
+### Uso con logging para debugging
+El sistema incluye logging automático que guarda información en `transcriptor.log`:
 
+```bash
+# Logging normal (solo errores importantes)
+python transcriptor-whisper.py --url "URL_DEL_STREAM" --debug
+
+# Ver logs en tiempo real
+tail -f transcriptor.log
+```
+
+### Argumentos disponibles
 Los argumentos disponibles son:
-- `--url`: URL del stream de YouTube a transcribir
+- `--url`: URL del stream de YouTube a transcribir **(requerido)**
 - `--model`: Tamaño del modelo Whisper a utilizar (tiny, base, small, medium, large), predeterminado es `small`
 - `--language`: Código de idioma para la transcripción (ej: es, en, fr), predeterminado se detecta automáticamente  
 - `--output`: Archivo de salida para guardar la transcripción, predeterminado es `transcripcion.txt`
 - `--chunk-size`: Tamaño del fragmento de audio en segundos, predeterminado es `10`
 - `--correct-words`: Archivo JSON con palabras correctas para corrección de transcripciones, predeterminado no se realiza corrección
+- `--debug`: Activar modo debug con logging detallado
 
-### Ejemplo con corrección de errores:
+### Ejemplos de uso:
+
 ```bash
-python transcriptor-whisper.py --url "https://www.youtube.com/watch?v=STREAM_ID" --correct-words "palabras_correctas.json"
+# Transcripción básica
+python transcriptor-whisper.py --url "https://www.youtube.com/watch?v=STREAM_ID"
+
+# Con modelo más preciso y corrección de errores
+python transcriptor-whisper.py --url "URL" --model medium --correct-words "palabras_correctas.json"
+
+# Con debugging activado para diagnóstico
+python transcriptor-whisper.py --url "URL" --debug
+
+# Configuración personalizada completa
+python transcriptor-whisper.py \
+  --url "URL_DEL_STREAM" \
+  --model large \
+  --language es \
+  --chunk-size 5 \
+  --output mi_transcripcion.txt \
+  --correct-words palabras_correctas.json \
+  --debug
 ```
 
 ### Ejemplo de ficheros de corrección de errores:
@@ -146,6 +179,20 @@ Puedes crear un fichero de palabras correctas, por ejemplo `palabras_correctas.j
 ### Terminación del programa
 
 Para detener la transcripción en cualquier momento, simplemente presiona **Ctrl+C**. El programa finalizará de manera controlada, asegurándose de que todos los procesos terminen correctamente y que las transcripciones se guarden.
+
+### Sistema de Logging
+
+El transcriptor incluye un **sistema de logging robusto** que facilita el debugging y monitoreo:
+
+#### Archivos generados:
+- `transcripcion.txt`: Transcripción del audio (salida principal)
+- `transcriptor.log`: Logs detallados del sistema (debugging)
+
+#### Tipos de logs:
+- **INFO**: Eventos importantes del sistema (inicio, fin, configuración aplicada)
+- **DEBUG**: Información detallada para desarrollo (URLs obtenidas, chunks procesados)
+- **ERROR**: Errores y excepciones con detalles para diagnóstico
+- **WARNING**: Situaciones que requieren atención pero no detienen el proceso
 
 ## Uso WhisperX
 Para ejecutar el transcriptor de whisperX, que implementa diarización, con los valores predeterminados son necesarios tanto la url del stream, como un token de Hugging Face:
