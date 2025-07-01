@@ -20,7 +20,7 @@ def get_audio_stream_url(youtube_url):
         return info['url']
     
 # Configurar logging
-def setup_logging(debug=False):
+def setup_logging(debug=False, name ="youtube_transcriptor"):
     """Configura el sistema de logging."""
     level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
@@ -31,7 +31,7 @@ def setup_logging(debug=False):
             logging.FileHandler('transcriptor.log', encoding='utf-8')  # Archivo
         ]
     )
-    return logging.getLogger(__name__)
+    return logging.getLogger(name)
 
 
 def load_correct_words(file_path="palabras_correctas.json"):
