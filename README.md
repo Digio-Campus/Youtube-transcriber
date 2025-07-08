@@ -49,7 +49,7 @@ unidecode
 
 1. Clona este repositorio
    ```bash
-   git clone https://github.com/Digio-Campus/Youtube-transcriber
+   git clone https://github.com/Digio-Campus/Youtube-transcriber.git
    cd Stream-transcriber
    ```
 
